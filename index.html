@@ -164,14 +164,8 @@
 <a class="admin-link" href="admin.html">admin</a>
 <div class="alert-overlay" id="alertOverlay"></div>
 
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-  import { FIREBASE_CONFIG } from './firebase-config.js';
+<script>
 
-  const app = initializeApp(FIREBASE_CONFIG);
-  const db = getDatabase(app);
-  const CONFIG_REF = ref(db, 'timer/config');
 
   function pad(n) { return String(Math.floor(Math.abs(n))).padStart(2,'0'); }
   function fmtSec(s) { s = Math.max(0,s); return pad(s/60)+':'+pad(s%60); }
@@ -303,10 +297,19 @@
     iv = setInterval(tick, 500);
   }
 
-  // ฟัง Firebase realtime — อัปเดตทันทีเมื่อ admin เปลี่ยน
-  onValue(CONFIG_REF, (snap) => {
-    if (snap.exists()) applyConfig(snap.val());
-  });
+  // ฟัง SSE — อัปเดตทันทีเมื่อ admin เปลี่ยน
+  function connectSSE() {
+    const es = new EventSource('/api/sse');
+    es.onmessage = (e) => {
+      const cfg = JSON.parse(e.data);
+      if (!cfg.error) applyConfig(cfg);
+    };
+    es.onerror = () => {
+      es.close();
+      setTimeout(connectSSE, 3000); // reconnect
+    };
+  }
+  connectSSE();
 </script>
 </body>
 </html>

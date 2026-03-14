@@ -216,18 +216,9 @@
   </div>
 </div>
 
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-  import { FIREBASE_CONFIG } from './firebase-config.js';
-
-  const app = initializeApp(FIREBASE_CONFIG);
-  const db = getDatabase(app);
-  const CONFIG_REF = ref(db, 'timer/config');
-
+<script>
   const ADMIN_PIN = '1234';
 
-  // PIN check
   const pinInput = document.getElementById('pinInput');
   pinInput.addEventListener('input', () => {
     if (pinInput.value.length === 4) checkPin();
@@ -256,16 +247,14 @@
 
   async function loadCurrentConfig() {
     try {
-      const snap = await get(CONFIG_REF);
-      if (snap.exists()) {
-        const cfg = snap.val();
-        showCurrentConfig(cfg);
-        // prefill
-        document.getElementById('iH').value = String(cfg.h).padStart(2,'0');
-        document.getElementById('iM').value = String(cfg.m).padStart(2,'0');
-        document.getElementById('iS').value = String(cfg.s).padStart(2,'0');
-        document.getElementById('iInterval').value = Math.round(cfg.interval / 60);
-      }
+      const res = await fetch('/api/config');
+      if (!res.ok) return;
+      const cfg = await res.json();
+      showCurrentConfig(cfg);
+      document.getElementById('iH').value = String(cfg.h).padStart(2,'0');
+      document.getElementById('iM').value = String(cfg.m).padStart(2,'0');
+      document.getElementById('iS').value = String(cfg.s).padStart(2,'0');
+      document.getElementById('iInterval').value = Math.round(cfg.interval / 60);
     } catch(e) {
       console.error('load config error', e);
     }
@@ -280,7 +269,7 @@
     box.style.display = 'block';
   }
 
-  window.saveConfig = async function() {
+  window.saveConfig = async function saveConfig() {
     const h = parseInt(document.getElementById('iH').value);
     const m = parseInt(document.getElementById('iM').value);
     const s = parseInt(document.getElementById('iS').value);
@@ -298,9 +287,14 @@
     btn.innerHTML = '<span class="spinner"></span>กำลังบันทึก...';
 
     try {
-      const cfg = { h, m, s, interval: mins * 60, updatedAt: Date.now() };
-      await set(CONFIG_REF, cfg);
-      showCurrentConfig(cfg);
+      const body = { h, m, s, interval: mins * 60 };
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showCurrentConfig({ ...body });
       setStatus('✓ บันทึกแล้ว — ทุกหน้า View จะอัปเดตทันที', 'ok');
     } catch(e) {
       setStatus('เกิดข้อผิดพลาด: ' + e.message, 'err');
@@ -308,7 +302,7 @@
       btn.disabled = false;
       btn.textContent = 'บันทึกและเริ่ม →';
     }
-  };
+  }
 
   function setStatus(msg, type) {
     const el = document.getElementById('statusRow');
