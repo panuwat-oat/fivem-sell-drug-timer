@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Drug Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #c8f060;
+    --accent-dim: rgba(200,240,96,0.12);
+    --text: #f0f0f0;
+    --muted: #555;
+    --danger: #ff5f5f;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,240,96,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,240,96,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  .container { width: 420px; padding: 0 16px; }
+
+  .header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 40px; }
+  .header-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .header-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite; flex-shrink: 0;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .waiting { text-align: center; }
+  .waiting-icon { font-size: 48px; margin-bottom: 20px; opacity: 0.3; }
+  .waiting-text { font-size: 13px; color: var(--muted); letter-spacing: 0.08em; line-height: 1.8; }
+  .waiting-text span { color: var(--accent); }
+
+  .timer { display: none; flex-direction: column; }
+  .timer.visible { display: flex; }
+
+  .current-clock { font-size: 11px; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 28px; font-variant-numeric: tabular-nums; }
+  .current-clock span { color: var(--text); }
+
+  .countdown-wrap { margin-bottom: 10px; }
+
+  .countdown {
+    font-family: 'Syne', sans-serif;
+    font-size: 96px; font-weight: 800; letter-spacing: -4px; line-height: 1;
+    color: var(--text); transition: color 0.3s;
+    font-variant-numeric: tabular-nums;
+  }
+  .countdown.warning { color: var(--danger); }
+
+  .progress-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 16px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s linear, background 0.3s; width: 100%; }
+  .progress-bar.warning { background: var(--danger); }
+
+  .loop-header { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 10px; }
+  .loop-header-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .loop-count-badge {
+    font-size: 11px; font-weight: 500;
+    background: var(--accent-dim); color: var(--accent);
+    border: 1px solid rgba(200,240,96,0.2);
+    border-radius: 20px; padding: 2px 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .loop-log {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    max-height: 130px; overflow-y: auto; padding: 8px 0;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .loop-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; font-size: 12px; font-variant-numeric: tabular-nums;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .loop-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+  .loop-item-num { color: var(--muted); min-width: 36px; }
+  .loop-item-range { color: var(--text); }
+  .loop-item-status { font-size: 11px; color: var(--accent); }
+
+  .next-row { font-size: 12px; color: var(--muted); margin: 14px 0 20px; letter-spacing: 0.05em; }
+  .next-row span { color: var(--text); font-weight: 500; }
+
+  .alert-overlay {
+    display: none; position: fixed; inset: 0;
+    border: 2px solid var(--accent); pointer-events: none;
+  }
+  .alert-overlay.show { display: block; animation: flash 0.4s ease-in-out 3; }
+  @keyframes flash { 0%,100% { opacity: 0; } 50% { opacity: 1; } }
+
+  .admin-link {
+    position: fixed; bottom: 16px; right: 16px;
+    font-size: 10px; color: var(--border); letter-spacing: 0.1em;
+    text-decoration: none; transition: color 0.2s;
+  }
+  .admin-link:hover { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-dot"></div>
+    <div class="header-title">Interval Timer — View</div>
+  </div>
+
+  <div class="waiting" id="waiting">
+    <div class="waiting-icon">⏳</div>
+    <div class="waiting-text">รอ admin ตั้งเวลา<br/><span>ยังไม่มีการกำหนดเวลาขายยา</span></div>
+  </div>
+
+  <div class="timer" id="timer">
+    <div class="current-clock">เวลาปัจจุบัน <span id="clockNow">--:--:--</span></div>
+
+    <div class="countdown-wrap">
+      <div class="countdown" id="countdown">05:00</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </div>
+
+    <div class="next-row">แจ้งเตือนถัดไป <span id="nextAlert">--:--:--</span></div>
+
+    <div class="loop-header">
+      <div class="loop-header-label">ประวัติรอบ</div>
+      <div class="loop-count-badge">รอบที่ <span id="loopNum">1</span></div>
+    </div>
+    <div class="loop-log" id="loopLog"></div>
+  </div>
+</div>
+
+<a class="admin-link" href="admin.html">admin</a>
+<div class="alert-overlay" id="alertOverlay"></div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+  import { FIREBASE_CONFIG } from './firebase-config.js';
+
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db = getDatabase(app);
+  const CONFIG_REF = ref(db, 'timer/config');
+
+  function pad(n) { return String(Math.floor(Math.abs(n))).padStart(2,'0'); }
+  function fmtSec(s) { s = Math.max(0,s); return pad(s/60)+':'+pad(s%60); }
+  function fmtHMS(d) { return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+
+  let currentTargetMs = null;
+  let currentStartMs = null;
+  let loopIndex = 0;
+  let iv = null;
+  let alertedLoops = new Set();
+  let logs = [];
+  let TOTAL = 300;
+
+  setInterval(() => {
+    const el = document.getElementById('clockNow');
+    if (el) el.textContent = fmtHMS(new Date());
+  }, 500);
+
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [[0,880],[0.18,1100],[0.36,880],[0.54,1320]].forEach(([t,freq]) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.35, ctx.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+t+0.15);
+        o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.16);
+      });
+    } catch(e){}
+  }
+
+  function doAlert(loopI, startD, endD) {
+    if (alertedLoops.has(loopI)) return;
+    alertedLoops.add(loopI);
+    beep();
+
+    const ov = document.getElementById('alertOverlay');
+    ov.classList.remove('show');
+    void ov.offsetWidth;
+    ov.classList.add('show');
+    setTimeout(() => ov.classList.remove('show'), 1400);
+
+    logs.unshift({ num: loopI, start: fmtHMS(startD), end: fmtHMS(endD) });
+    renderLog();
+
+    loopIndex++;
+    currentStartMs = currentTargetMs;
+    currentTargetMs = currentStartMs + TOTAL * 1000;
+    document.getElementById('loopNum').textContent = loopIndex + 1;
+    updateNextAlert();
+  }
+
+  function renderLog() {
+    const el = document.getElementById('loopLog');
+    el.innerHTML = logs.map(l => `
+      <div class="loop-item">
+        <span class="loop-item-num">#${l.num}</span>
+        <span class="loop-item-range">${l.start} → ${l.end}</span>
+        <span class="loop-item-status">✓ done</span>
+      </div>
+    `).join('');
+  }
+
+  function updateNextAlert() {
+    if (!currentTargetMs) return;
+    document.getElementById('nextAlert').textContent = fmtHMS(new Date(currentTargetMs));
+  }
+
+  function tick() {
+    const now = Date.now();
+
+    if (now < currentStartMs) {
+      document.getElementById('countdown').textContent = fmtSec(Math.ceil((currentStartMs - now) / 1000));
+      document.getElementById('countdown').style.color = 'var(--muted)';
+      document.getElementById('progressBar').style.width = '0%';
+      return;
+    }
+
+    document.getElementById('countdown').style.color = '';
+
+    const remaining = Math.ceil((currentTargetMs - now) / 1000);
+    const progress = Math.min(1, (now - currentStartMs) / (TOTAL * 1000));
+    const cd = document.getElementById('countdown');
+    const pb = document.getElementById('progressBar');
+
+    if (remaining > 0) {
+      cd.textContent = fmtSec(remaining);
+      cd.classList.toggle('warning', remaining <= 30);
+      pb.style.width = (progress * 100).toFixed(1) + '%';
+      pb.classList.toggle('warning', remaining <= 30);
+    } else {
+      doAlert(loopIndex, new Date(currentStartMs), new Date(currentTargetMs));
+    }
+  }
+
+  function applyConfig(cfg) {
+    const { h, m, s, interval } = cfg;
+    TOTAL = (interval && interval > 0) ? interval : 300;
+
+    const anchor = new Date();
+    anchor.setHours(h, m, s, 0);
+    const anchorMs = anchor.getTime();
+    const now = Date.now();
+
+    if (now < anchorMs) {
+      currentStartMs = anchorMs;
+      currentTargetMs = anchorMs + TOTAL * 1000;
+      loopIndex = 1;
+    } else {
+      const loopsPassed = Math.floor((now - anchorMs) / (TOTAL * 1000));
+      loopIndex = loopsPassed + 1;
+      currentStartMs = anchorMs + loopsPassed * TOTAL * 1000;
+      currentTargetMs = currentStartMs + TOTAL * 1000;
+    }
+
+    alertedLoops.clear();
+    logs = [];
+    document.getElementById('loopNum').textContent = loopIndex;
+    document.getElementById('loopLog').innerHTML = '';
+    updateNextAlert();
+
+    document.getElementById('waiting').style.display = 'none';
+    document.getElementById('timer').classList.add('visible');
+
+    if (iv) clearInterval(iv);
+    tick();
+    iv = setInterval(tick, 500);
+  }
+
+  // ฟัง Firebase realtime — อัปเดตทันทีเมื่อ admin เปลี่ยน
+  onValue(CONFIG_REF, (snap) => {
+    if (snap.exists()) applyConfig(snap.val());
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin — Drug Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #c8f060;
+    --accent-dim: rgba(200,240,96,0.12);
+    --text: #f0f0f0;
+    --muted: #555;
+    --danger: #ff5f5f;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,240,96,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,240,96,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  .container { width: 420px; padding: 0 16px; position: relative; z-index: 1; }
+
+  .header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 40px; }
+  .header-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .header-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0;
+  }
+  .header-badge {
+    font-size: 10px; letter-spacing: 0.1em;
+    background: rgba(255,95,95,0.12); color: var(--danger);
+    border: 1px solid rgba(255,95,95,0.25);
+    border-radius: 20px; padding: 2px 10px; margin-left: auto;
+  }
+
+  .label { font-size: 11px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
+
+  /* lock screen */
+  .lock { transition: opacity 0.3s; }
+  .lock.hidden { display: none; }
+
+  .pin-inputs { display: flex; gap: 10px; margin-bottom: 8px; }
+  .pin-input {
+    width: 80px; text-align: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 32px; font-weight: 400; padding: 12px 0;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield; letter-spacing: 0.3em;
+  }
+  .pin-input::-webkit-inner-spin-button, .pin-input::-webkit-outer-spin-button { display: none; }
+  .pin-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .pin-input.error { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(255,95,95,0.15); animation: shake 0.3s ease; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  .pin-hint { font-size: 11px; color: var(--muted); margin-bottom: 24px; }
+  .pin-hint.err { color: var(--danger); }
+
+  /* panel */
+  .panel { display: none; }
+  .panel.visible { display: block; }
+
+  .time-inputs { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+  .seg {
+    width: 80px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 32px; font-weight: 400; text-align: center; padding: 12px 0;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield;
+  }
+  .seg::-webkit-inner-spin-button, .seg::-webkit-outer-spin-button { display: none; }
+  .seg:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .seg-sep { font-size: 28px; color: var(--muted); padding: 0 2px; user-select: none; }
+
+  .hint { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 24px; }
+  .hint span { color: var(--accent); }
+
+  .interval-row { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .interval-label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; white-space: nowrap; }
+  .interval-input {
+    width: 80px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 22px; font-weight: 400; text-align: center; padding: 8px 0;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield;
+  }
+  .interval-input::-webkit-inner-spin-button, .interval-input::-webkit-outer-spin-button { display: none; }
+  .interval-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .interval-unit { font-size: 11px; color: var(--muted); }
+
+  .save-btn {
+    width: 100%; padding: 14px;
+    background: var(--accent); color: #0a0a0a;
+    border: none; border-radius: 6px;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+    margin-bottom: 12px;
+  }
+  .save-btn:hover { opacity: 0.88; }
+  .save-btn:active { transform: scale(0.98); }
+  .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .status-row {
+    font-size: 11px; text-align: center; letter-spacing: 0.06em;
+    min-height: 18px; transition: color 0.3s;
+  }
+  .status-row.ok { color: var(--accent); }
+  .status-row.err { color: var(--danger); }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  .current-config {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .current-config-label { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .config-val { font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .config-val span { color: var(--accent); }
+
+  .view-link {
+    display: block; text-align: center; margin-top: 20px;
+    font-size: 11px; color: var(--muted); letter-spacing: 0.08em;
+    text-decoration: none; transition: color 0.2s;
+  }
+  .view-link:hover { color: var(--accent); }
+
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-dot"></div>
+    <div class="header-title">Admin Panel</div>
+    <div class="header-badge">RESTRICTED</div>
+  </div>
+
+  <!-- Lock Screen -->
+  <div class="lock" id="lock">
+    <div class="label">รหัสผ่าน admin</div>
+    <div class="pin-inputs">
+      <input class="pin-input" id="pinInput" type="password" maxlength="4" placeholder="••••" autocomplete="off"/>
+    </div>
+    <div class="pin-hint" id="pinHint">ใส่รหัส 4 หลักเพื่อเข้าสู่ระบบ</div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div class="panel" id="panel">
+    <div class="label">เวลาเริ่มต้น (รอบแรก)</div>
+    <div class="time-inputs">
+      <input class="seg" id="iH" type="number" min="0" max="23" placeholder="HH"/>
+      <span class="seg-sep">:</span>
+      <input class="seg" id="iM" type="number" min="0" max="59" placeholder="MM"/>
+      <span class="seg-sep">:</span>
+      <input class="seg" id="iS" type="number" min="0" max="59" placeholder="SS"/>
+    </div>
+    <div class="hint">เช่น <span>20:29:40</span> → แจ้งเตือน <span>20:34:40</span> → <span>20:39:40</span> → วนไปเรื่อยๆ</div>
+
+    <div class="interval-row">
+      <span class="interval-label">ระยะเวลาต่อรอบ</span>
+      <input class="interval-input" id="iInterval" type="number" min="1" max="3600" value="5"/>
+      <span class="interval-unit">นาที</span>
+    </div>
+
+    <button class="save-btn" id="saveBtn" onclick="saveConfig()">บันทึกและเริ่ม →</button>
+    <div class="status-row" id="statusRow"></div>
+
+    <hr class="divider"/>
+
+    <div class="current-config" id="currentConfig" style="display:none">
+      <div class="current-config-label">Config ปัจจุบัน</div>
+      <div class="config-val" id="configDisplay">—</div>
+    </div>
+
+    <a class="view-link" href="index.html">← ไปหน้า View</a>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+  import { FIREBASE_CONFIG } from './firebase-config.js';
+
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db = getDatabase(app);
+  const CONFIG_REF = ref(db, 'timer/config');
+
+  const ADMIN_PIN = '1234';
+
+  // PIN check
+  const pinInput = document.getElementById('pinInput');
+  pinInput.addEventListener('input', () => {
+    if (pinInput.value.length === 4) checkPin();
+  });
+  pinInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') checkPin();
+  });
+
+  function checkPin() {
+    if (pinInput.value === ADMIN_PIN) {
+      document.getElementById('lock').classList.add('hidden');
+      document.getElementById('panel').classList.add('visible');
+      loadCurrentConfig();
+    } else {
+      pinInput.classList.add('error');
+      document.getElementById('pinHint').textContent = 'รหัสไม่ถูกต้อง ลองใหม่';
+      document.getElementById('pinHint').classList.add('err');
+      pinInput.value = '';
+      setTimeout(() => {
+        pinInput.classList.remove('error');
+        document.getElementById('pinHint').textContent = 'ใส่รหัส 4 หลักเพื่อเข้าสู่ระบบ';
+        document.getElementById('pinHint').classList.remove('err');
+      }, 1500);
+    }
+  }
+
+  async function loadCurrentConfig() {
+    try {
+      const snap = await get(CONFIG_REF);
+      if (snap.exists()) {
+        const cfg = snap.val();
+        showCurrentConfig(cfg);
+        // prefill
+        document.getElementById('iH').value = String(cfg.h).padStart(2,'0');
+        document.getElementById('iM').value = String(cfg.m).padStart(2,'0');
+        document.getElementById('iS').value = String(cfg.s).padStart(2,'0');
+        document.getElementById('iInterval').value = Math.round(cfg.interval / 60);
+      }
+    } catch(e) {
+      console.error('load config error', e);
+    }
+  }
+
+  function showCurrentConfig(cfg) {
+    const box = document.getElementById('currentConfig');
+    const disp = document.getElementById('configDisplay');
+    const pad = n => String(n).padStart(2,'0');
+    const mins = Math.round(cfg.interval / 60);
+    disp.innerHTML = `เริ่ม <span>${pad(cfg.h)}:${pad(cfg.m)}:${pad(cfg.s)}</span> · ทุก <span>${mins} นาที</span>`;
+    box.style.display = 'block';
+  }
+
+  window.saveConfig = async function() {
+    const h = parseInt(document.getElementById('iH').value);
+    const m = parseInt(document.getElementById('iM').value);
+    const s = parseInt(document.getElementById('iS').value);
+    const mins = parseInt(document.getElementById('iInterval').value);
+
+    if (isNaN(h) || isNaN(m) || isNaN(s) || isNaN(mins)) {
+      setStatus('กรุณาใส่ข้อมูลให้ครบ', 'err'); return;
+    }
+    if (mins < 1 || mins > 60) {
+      setStatus('ระยะเวลาต้องอยู่ระหว่าง 1–60 นาที', 'err'); return;
+    }
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>กำลังบันทึก...';
+
+    try {
+      const cfg = { h, m, s, interval: mins * 60, updatedAt: Date.now() };
+      await set(CONFIG_REF, cfg);
+      showCurrentConfig(cfg);
+      setStatus('✓ บันทึกแล้ว — ทุกหน้า View จะอัปเดตทันที', 'ok');
+    } catch(e) {
+      setStatus('เกิดข้อผิดพลาด: ' + e.message, 'err');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'บันทึกและเริ่ม →';
+    }
+  };
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('statusRow');
+    el.textContent = msg;
+    el.className = 'status-row ' + type;
+    if (type === 'ok') setTimeout(() => { el.textContent = ''; el.className = 'status-row'; }, 4000);
+  }
+</script>
+</body>
+</html>
