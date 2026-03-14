@@ -127,6 +127,28 @@
     text-decoration: none; transition: color 0.2s;
   }
   .admin-link:hover { color: var(--muted); }
+
+  /* sound unlock banner */
+  .sound-banner {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; z-index: 100;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: none; } }
+  .sound-banner.hidden { display: none; }
+  .sound-banner-text { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+  .sound-banner-text span { color: var(--text); }
+  .sound-unlock-btn {
+    padding: 8px 20px; flex-shrink: 0;
+    background: var(--accent); color: #0a0a0a;
+    border: none; border-radius: 6px;
+    font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -164,6 +186,11 @@
 <a class="admin-link" href="admin.html">admin</a>
 <div class="alert-overlay" id="alertOverlay"></div>
 
+<div class="sound-banner" id="soundBanner">
+  <div class="sound-banner-text"><span>เปิดเสียงแจ้งเตือน</span> — กดเพื่ออนุญาตเสียงบนอุปกรณ์นี้</div>
+  <button class="sound-unlock-btn" onclick="unlockSound()">เปิดเสียง</button>
+</div>
+
 <script>
 
 
@@ -178,15 +205,30 @@
   let alertedLoops = new Set();
   let logs = [];
   let TOTAL = 300;
+  let audioCtx = null;
 
   setInterval(() => {
     const el = document.getElementById('clockNow');
     if (el) el.textContent = fmtHMS(new Date());
   }, 500);
 
+  function unlockSound() {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // play silent buffer เพื่อ unlock
+      const buf = audioCtx.createBuffer(1, 1, 22050);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch(e){}
+    document.getElementById('soundBanner').classList.add('hidden');
+  }
+
   function beep() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
       [[0,880],[0.18,1100],[0.36,880],[0.54,1320]].forEach(([t,freq]) => {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
