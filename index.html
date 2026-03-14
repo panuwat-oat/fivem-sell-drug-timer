@@ -203,6 +203,8 @@
   let loopIndex = 0;
   let iv = null;
   let alertedLoops = new Set();
+  let warnedLoops10 = new Set();
+  let warnedLoops5 = new Set();
   let logs = [];
   let TOTAL = 300;
   let audioCtx = null;
@@ -237,6 +239,24 @@
         g.gain.setValueAtTime(0.35, ctx.currentTime+t);
         g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+t+0.15);
         o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.16);
+      });
+    } catch(e){}
+  }
+
+  function beepWarn(sec) {
+    // 10 วิ = 2 pip สั้น, 5 วิ = 3 pip สั้นเร็ว
+    try {
+      const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+      const pips = sec === 10 ? [[0,660],[0.15,660]] : [[0,880],[0.12,880],[0.24,880]];
+      pips.forEach(([t,freq]) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = freq;
+        g.gain.setValueAtTime(0.25, ctx.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+t+0.09);
+        o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.1);
       });
     } catch(e){}
   }
@@ -300,6 +320,15 @@
       cd.classList.toggle('warning', remaining <= 30);
       pb.style.width = (progress * 100).toFixed(1) + '%';
       pb.classList.toggle('warning', remaining <= 30);
+
+      if (remaining <= 10 && !warnedLoops10.has(loopIndex)) {
+        warnedLoops10.add(loopIndex);
+        beepWarn(10);
+      }
+      if (remaining <= 5 && !warnedLoops5.has(loopIndex)) {
+        warnedLoops5.add(loopIndex);
+        beepWarn(5);
+      }
     } else {
       doAlert(loopIndex, new Date(currentStartMs), new Date(currentTargetMs));
     }
@@ -326,6 +355,8 @@
     }
 
     alertedLoops.clear();
+    warnedLoops10.clear();
+    warnedLoops5.clear();
     logs = [];
     document.getElementById('loopNum').textContent = loopIndex;
     document.getElementById('loopLog').innerHTML = '';
